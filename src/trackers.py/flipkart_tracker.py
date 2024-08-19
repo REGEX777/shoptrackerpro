@@ -2,7 +2,9 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 import pandas as pd
+from dotenv import load_dotenv
 import os
+header = os.getenv('HEADER')
 
 products = [
     {
