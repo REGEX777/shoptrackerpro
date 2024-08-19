@@ -1,52 +1,41 @@
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
-from dotenv import load_dotenv
-from pymongo import MongoClient
-import os
 import pandas as pd
+import os
 
-load_dotenv()
-
-mongo_client = MongoClient("mongodb://localhost:27017/")
-db = mongo_client["price_tracker"]
-collection = db["flipkart_prices"]
-
-
-
-header = os.getenv('HEADER')
-url = "https://www.flipkart.com/apple-iphone-14-pro-space-black-128-gb/p/itm5e220e9a699fb"
+products = [
+    {
+        "name": "iPhone 14 Pro",
+        "url": "https://www.flipkart.com/apple-iphone-14-pro-space-black-128-gb/p/itm5e220e9a699fb"
+    },
+    {
+        "name": "Canon R100 Mirrorless Camera RF-S 18-45mm f/4.5-6.3 IS STM ",
+        "url": "https://www.flipkart.com/canon-r100-mirrorless-camera-rf-s-18-45mm-f-4-5-6-3-stm/p/itm3bc65ea11d81b"
+    },
+]
 
 headers = {
-    "User-Agent": header
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
 }
 
-def get_price():
-    response = requests.get(url, headers=headers)
-
-    soup = BeautifulSoup(response.content, "html.parser")
-
-    price_element = soup.select_one("div._30jeq3._16Jk6d")
-
-    if price_element:
-        return price_element.text.strip()
-    else:
+def get_price(url):
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, "html.parser")
+        price_element = soup.select_one("div._30jeq3._16Jk6d")
+        return price_element.text.strip() if price_element else None
+    except requests.RequestException as e:
+        print(f"Error fetching the price: {e}")
         return None
 
-def save_to_mongodb(price):
-    data = {
-        "timestamp": datetime.now(),
-        "price": price
-    }
-    collection.insert_one(data)
+def format_price(price):
+    if price:
+        return f"₹{price.replace(',', '')}"
+    return "Price not found"
 
-def save_to_excel(price, file_path):
-    # lets make a dataframeeeeeee
-    data = {
-        "Timestamp": [datetime.now()],
-        "Product": ["iPhone 14 Pro"],
-        "Price": [format_price(price)]
-    }
+def save_to_excel(data, file_path):
     df = pd.DataFrame(data)
 
     if os.path.exists(file_path):
@@ -56,14 +45,23 @@ def save_to_excel(price, file_path):
         with pd.ExcelWriter(file_path) as writer:
             df.to_excel(writer, sheet_name='Prices', index=False)
 
+def track_prices():
+    data = []
+    for product in products:
+        price = get_price(product['url'])
+        formatted_price = format_price(price)
+        if price:
+            print(f"[{datetime.now()}] The current price of {product['name']} is: {formatted_price}")
+            data.append({
+                "Timestamp": datetime.now(),
+                "Product": product['name'],
+                "Price": formatted_price
+            })
+        else:
+            print(f"[{datetime.now()}] Failed to retrieve the price for {product['name']}.")
+    
+    if data:
+        save_to_excel(data, "price_tracker.xlsx")
 
-
-
-def track_price():
-    price = get_price()
-    if price:
-        print(f"[{datetime.now()}] The current price of the product is: {price}")
-    else:
-        print(f"[{datetime.now()}] Failed to retrieve the price.")
-
-if __name__ == "__mai
+if __name__ == "__main__":
+    track_prices()
