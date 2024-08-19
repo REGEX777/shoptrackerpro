@@ -8,4 +8,4 @@ class MongoDB:
     def get_collection(self, collection_name):
         return self.db[collection_name]
 
-db = MongoDB("mongodb://localhost:27017/", "price_tracker")
+db = MongoDB("mongodb://localhost:27017/", "adityas_price_tracker")
