@@ -7,7 +7,7 @@ import os
 load_dotenv()
 
 header = os.getenv('HEADER')
-url = "https://www.amazon.in/Apple-iPhone-Pro-Max-256/dp/B0CHX68YG9/ref=sr_1_3?sr=8-3"
+url = "https://www.flipkart.com/apple-iphone-14-pro-space-black-128-gb/p/itm5e220e9a699fb"
 
 headers = {
     "User-Agent": header
@@ -15,9 +15,10 @@ headers = {
 
 def get_price():
     response = requests.get(url, headers=headers)
+
     soup = BeautifulSoup(response.content, "html.parser")
 
-    price_element = soup.select_one("span#priceblock_ourprice")
+    price_element = soup.select_one("div._30jeq3._16Jk6d")
 
     if price_element:
         return price_element.text.strip()
@@ -31,5 +32,4 @@ def track_price():
     else:
         print(f"[{datetime.now()}] Failed to retrieve the price.")
 
-if __name__ == "__main__":
-    track_price()
+if __name__ == "__mai
