@@ -1,12 +1,11 @@
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from pymongo import MongoClient
 import os
 import pandas as pd
 import time
-from collections import defaultdict
 import logging
 
 load_dotenv()
@@ -15,6 +14,7 @@ mongo_client = MongoClient("mongodb://localhost:27017/")
 db = mongo_client["price_tracker"]
 products_collection = db["products"]
 prices_collection = db["amazon_prices"]
+price_drops_collection = db["price_drops"]
 
 header = os.getenv('HEADER')
 
@@ -42,44 +42,51 @@ def save_to_mongodb(product_name, price):
     }
     prices_collection.insert_one(data)
 
-def save_to_excel(price_data, file_path):
+def save_to_csv(price_data, file_path):
     df = pd.DataFrame(price_data)
     if os.path.exists(file_path):
-        with pd.ExcelWriter(file_path, mode='a', if_sheet_exists='overlay') as writer:
-            df.to_excel(writer, sheet_name='Prices', index=False, header=False)
+        df.to_csv(file_path, mode='a', header=False, index=False)
     else:
-        with pd.ExcelWriter(file_path) as writer:
-            df.to_excel(writer, sheet_name='Prices', index=False)
+        df.to_csv(file_path, index=False)
 
-def aggregate_price_data():
-    pipeline = [
-        {
-            "$group": {
-                "_id": "$product",
-                "min_price": {"$min": "$price"},
-                "max_price": {"$max": "$price"},
-                "average_price": {"$avg": "$price"},
-                "last_checked": {"$max": "$timestamp"}
-            }
-        }
-    ]
-    return list(prices_collection.aggregate(pipeline))
+def log_price_drop(product_name, old_price, new_price):
+    data = {
+        "timestamp": datetime.now(),
+        "product": product_name,
+        "old_price": old_price,
+        "new_price": new_price,
+        "price_drop": old_price - new_price
+    }
+    price_drops_collection.insert_one(data)
 
-def generate_report():
-    aggregated_data = aggregate_price_data()
-    report_data = []
-    for data in aggregated_data:
-        report_data.append({
-            "Product": data["_id"],
-            "Min Price": data["min_price"],
-            "Max Price": data["max_price"],
-            "Average Price": data["average_price"],
-            "Last Checked": data["last_checked"]
-        })
-    df = pd.DataFrame(report_data)
-    report_path = f"price_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    df.to_excel(report_path, index=False)
-    logging.info(f"Generated report: {report_path}")
+def calculate_price_change(product_name):
+    recent_prices = list(prices_collection.find({"product": product_name}).sort("timestamp", -1).limit(2))
+    if len(recent_prices) == 2:
+        old_price = float(recent_prices[1]["price"].replace('₹', '').replace(',', ''))
+        new_price = float(recent_prices[0]["price"].replace('₹', '').replace(',', ''))
+        if new_price < old_price:
+            log_price_drop(product_name, old_price, new_price)
+        return round(((new_price - old_price) / old_price) * 100, 2)
+    return None
+
+def generate_trend_analysis():
+    products = list(prices_collection.distinct("product"))
+    trend_data = []
+    for product in products:
+        product_prices = list(prices_collection.find({"product": product}))
+        if len(product_prices) > 1:
+            timestamps = [entry["timestamp"] for entry in product_prices]
+            prices = [float(entry["price"].replace('₹', '').replace(',', '')) for entry in product_prices]
+            trend_data.append({
+                "Product": product,
+                "First Tracked": timestamps[0],
+                "Last Tracked": timestamps[-1],
+                "Price Change (%)": round(((prices[-1] - prices[0]) / prices[0]) * 100, 2)
+            })
+    df = pd.DataFrame(trend_data)
+    trend_report_path = f"price_trend_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    df.to_csv(trend_report_path, index=False)
+    logging.info(f"Generated trend analysis: {trend_report_path}")
 
 def track_prices():
     products = list(products_collection.find())
@@ -96,6 +103,7 @@ def track_prices():
                     "Product": product['name'],
                     "Price": price
                 })
+                calculate_price_change(product['name'])
             else:
                 save_to_mongodb(product['name'], price)
                 price_data.append({
@@ -105,15 +113,15 @@ def track_prices():
                 })
         else:
             logging.warning(f"Failed to retrieve price for {product['name']}")
-    save_to_excel(price_data, "price_tracker.xlsx")
+    save_to_csv(price_data, "price_tracker.csv")
     logging.info(f"Tracked prices for {len(products)} products")
 
 if __name__ == "__main__":
     try:
         while True:
             track_prices()
-            if datetime.now().hour == 0:  # Generate a report at midnight
-                generate_report()
+            if datetime.now().hour == 0:  
+                generate_trend_analysis()
             time.sleep(3600)
     except Exception as e:
         logging.error(f"Unexpected error: {str(e)}")
