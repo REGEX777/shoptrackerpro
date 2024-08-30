@@ -23,6 +23,26 @@ mongo_client = MongoClient("mongodb://localhost:27017/")
 db = mongo_client["price_tracker"]
 collection = db["product_prices"]
 
+def get_urls_from_user():
+    urls = []
+    print("enter product URLs (type 'done' when finished):")
+    while True:
+        url = input("enter URL: ").strip()
+        if url.lower() == 'done':
+            break
+        urls.append(url)
+    
+    with open('links.txt', 'w') as file:
+        for url in urls:
+            file.write(f"{url}\n")
+
+def read_urls_from_file():
+    urls = []
+    if os.path.exists('links.txt'):
+        with open('links.txt', 'r') as file:
+            urls = [line.strip() for line in file if line.strip()]
+    return urls
+
 def get_price_and_name(product):
     url = product['url']
     source = product['source']
