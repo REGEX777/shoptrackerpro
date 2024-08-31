@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Price Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+        <h1 class="text-2xl font-bold text-center mb-6">Price Tracker</h1>
+        <form action="{{ url_for('process_links') }}" method="POST" class="space-y-4">
+            <div>
+                <label for="urls" class="block text-sm font-medium text-gray-700">Enter Product URLs</label>
+                <textarea id="urls" name="urls" class="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                    placeholder="Enter one URL per line" rows="6"></textarea>
+            </div>
+            <div class="flex justify-center">
+                <button type="submit"
+                    class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 focus:outline-none">
+                    Start Tracking
+                </button>
+            </div>
+        </form>
+    </div>
+</body>
+
+</html>
