@@ -1,4 +1,5 @@
-
+![image](https://github.com/user-attachments/assets/9dcbc8e2-5614-44ff-a832-ab62f9110271)
+Log file
 
 Price Tracker
 =============
